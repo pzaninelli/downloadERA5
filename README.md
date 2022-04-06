@@ -31,4 +31,4 @@ This program requires CDO (_Climate Data Operator_) to be installed. See https:/
 sudo apt install cdo
 
 ```
-
+and it is also necessary to have the CDS API key installed. See https://cds.climate.copernicus.eu/api-how-to
