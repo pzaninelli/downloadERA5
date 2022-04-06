@@ -52,7 +52,7 @@ def main():
     print(_Download)
     should_continue = False
     count = 1
-    TIMEOUT = 30 # wait 6 hours
+    TIMEOUT = 60*60*2 # wait 2 hours
     while True:
         if count == 10:
             print("Run the script again!\n")
