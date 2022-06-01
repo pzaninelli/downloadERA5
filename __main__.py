@@ -10,6 +10,30 @@ import os
 import multiprocessing as mp
 from src.Era5Process import * 
 from src.read_params_from_file import get_params_text 
+from src.ParamsERA5 import *
+from optparse import OptionParser,OptionGroup
+parser = OptionParser(usage="usage: %prog list_of_files [GridInfo] [options] ",\
+                      version='%prog v0.0.1')
+    
+# general options
+parser.add_option("-q", "--quiet",
+                  action="store_false", dest="verbose", default=True,
+                  help="don't print status messages to stdout")
+# groupal options
+query_opts=OptionGroup(parser,'Query Options',"These options control the query mode")
+
+# file in to take the parameters
+query_opts.add_option("-f", "--filein", dest="file", action="store",
+    default="text/params.ini", help=".ini file to take the parameters")
+
+# timeout  
+query_opts.add_option("-t", "--timeout", dest="timeout", action="store",
+    default=60*60*2, help="Waiting time in seconds to stop the process")
+
+
+parser.add_option_group(query_opts)
+(options, args) = parser.parse_args()
+
 
 os.chdir(os.path.dirname(__file__)) # change dir to the current file
 
@@ -34,6 +58,25 @@ def downloadERA5_params_from_text(_params_text_file='./text/params.txt'):
                  freq=params['frequency'])
     return _Download
     
+def downloadERA5_params_from_ini(_params_ini_file = options.file):
+    assert path_exists(_params_ini_file), "ERROR:: File .ini does not exist!!"
+    params = ParamsERA5.from_file(_params_ini_file)
+    
+    return Era5Process(dataset_name=params.dataset, 
+                 product_type = params.product_type, 
+                 var = params.variable, 
+                 year = params.year, 
+                 month = params.month, 
+                 day = params.day, 
+                 time = params.time, 
+                 pressure_level=params.pressure_level, 
+                 grid=params.grid, 
+                 area=params.area, 
+                 stat=params.statistic, 
+                 freq=params.frequency,
+                 filename=params.filename)
+    
+        
 def run_era5_process(ERA5obj):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
     ERA5obj.run()
@@ -48,11 +91,11 @@ def main():
         type 'sudo apt install cdo' for Debian, Ubuntu
         or visit https://code.mpimet.mpg.de/projects/cdo/files
         """
-    _Download = downloadERA5_params_from_text()
+    _Download = downloadERA5_params_from_ini()
     print(_Download)
     should_continue = False
     count = 1
-    TIMEOUT = 60*60*2 # wait 2 hours
+    TIMEOUT = options.timeout # wait 2 hours
     while True:
         if count == 10:
             print("Run the script again!\n")
@@ -63,7 +106,7 @@ def main():
             should_continue = True
             break
         elif option.upper()=='C':
-            print("Process stoped!")
+            print("Process stopped!")
             break
         else:
             print("Incorrect option\n")
