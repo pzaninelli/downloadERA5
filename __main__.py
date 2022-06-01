@@ -12,7 +12,7 @@ from src.Era5Process import *
 from src.read_params_from_file import get_params_text 
 from src.ParamsERA5 import *
 from optparse import OptionParser,OptionGroup
-parser = OptionParser(usage="usage: %prog list_of_files [GridInfo] [options] ",\
+parser = OptionParser(usage="usage: %prog  [options] ",\
                       version='%prog v0.0.1')
     
 # general options
