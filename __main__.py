@@ -6,7 +6,7 @@ Main program of 'donwloadERA5'
 @author: Pablo G. Zaninelli
 """
 
-import os
+import os, sys
 import multiprocessing as mp
 from src.Era5Process import * 
 from src.read_params_from_file import get_params_text 
@@ -36,6 +36,24 @@ parser.add_option_group(query_opts)
 
 
 os.chdir(os.path.dirname(__file__)) # change dir to the current file
+
+class MyProc(mp.Process):
+    def run(self):
+        # Define the logging in run(), MyProc's entry function when it is .start()-ed 
+        #     p = MyProc()
+        #     p.start()
+        self.initialize_logging()
+
+        print('Now output is captured.')
+
+        # Now do stuff...
+
+    def initialize_logging(self):
+        sys.stdout = open(str(os.getpid()) + ".out", "a", buffering=0)
+        sys.stderr = open(str(os.getpid()) + "_error.out", "a", buffering=0)
+
+        print('stdout initialized')
+
 
 def is_installed_CDO():
     is_installed_cdo = subp.run(['which','cdo'],stdout=subp.PIPE, \
@@ -76,9 +94,15 @@ def downloadERA5_params_from_ini(_params_ini_file = options.file):
                  freq=params.frequency,
                  filename=params.filename)
     
+def info(title):
+    print(title)
+    print('module name:', __name__)
+    print('parent process:', os.getppid())
+    print('process id:', os.getpid())
         
 def run_era5_process(ERA5obj):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
+    info("run_era5_process")
     ERA5obj.run()
     
 def set_years(ERA5obj,year):
@@ -113,7 +137,7 @@ def main():
             continue
         count += 1
     if should_continue:
-        p = mp.Process(target=run_era5_process, name = "run_era5_process", args= (_Download,))
+        p = MyProc(target=run_era5_process, name = "run_era5_process", args= (_Download,))
         p.start()
         p.join(TIMEOUT)        
         if p.is_alive():
