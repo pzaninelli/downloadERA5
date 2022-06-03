@@ -62,7 +62,6 @@ def downloadERA5_params_from_text(_params_text_file='./text/params.txt'):
 def downloadERA5_params_from_ini(_params_ini_file = options.file):
     assert path_exists(_params_ini_file), "ERROR:: File .ini does not exist!!"
     params = ParamsERA5.from_file(_params_ini_file)
-    
     return Era5Process(dataset_name=params.dataset, 
                  product_type = params.product_type, 
                  var = params.variable, 
@@ -79,12 +78,39 @@ def downloadERA5_params_from_ini(_params_ini_file = options.file):
         
 def run_era5_process(ERA5obj):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
-    info("run_era5_process")
     ERA5obj.run()
     
 def set_years(ERA5obj,year):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
     ERA5obj.year = [year]
+    assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
+    
+    
+def split_era5_process(ERA5obj):
+    filename = ERA5obj.filename # copy the file name
+    years = ERA5obj.year
+    times = 0
+    for iy in years:
+        set_years(ERA5obj, iy)
+        times += len(ERA5obj.dates())
+        run_era5_process(ERA5obj)
+        if iy==years[0] and ERA5obj.Was_runned():
+            subp.run(['cdo','copy',ERA5obj.filename,filename], \
+                     stdout=subp.PIPE, stderr=subp.PIPE)
+            if file_exists(filename):
+                subp.run(['rm',ERA5obj.filename],
+                         stdout=subp.PIPE, stderr=subp.PIPE)
+        else:
+            subp.run(['cdo','cat',ERA5obj.filename,filename], \
+                     stdout=subp.PIPE, stderr=subp.PIPE)
+            cdo_ntime = subp.run(['cdo','ntime',filename], \
+                     stdout=subp.PIPE, stderr=subp.PIPE)
+            if times == int(cdo_ntime.stdout.decode('utf-8').replace('\n','')):
+                subp.run(['rm',ERA5obj.filename], \
+                         stdout=subp.PIPE, stderr=subp.PIPE)
+            else:
+                 raise ValueError("ERROR:: time steps do not match!!")
+                 
 
 def main():
     assert is_installed_CDO(), """
@@ -121,32 +147,19 @@ def main():
             print("Killing the process...\n")
             p.terminate()
             p.join()
-            filename = _Download.filename # copy the file name
-            years = _Download.year
-            times = 0
+            
             if file_exists(filename):
                 subp.run(['rm',filename], stdout=subp.PIPE, stderr=subp.PIPE)
-            for iy in years:
-                set_years(_Download, iy)
-                times += len(_Download.dates())
-                run_era5_process(_Download)
-                if iy==years[0] and _Download.Was_runned():
-                    subp.run(['cdo','copy',_Download.filename,filename], \
-                             stdout=subp.PIPE, stderr=subp.PIPE)
-                    if file_exists(filename):
-                        subp.run(['rm',_Download.filename],
-                                 stdout=subp.PIPE, stderr=subp.PIPE)
-                else:
-                    subp.run(['cdo','cat',_Download.filename,filename], \
-                             stdout=subp.PIPE, stderr=subp.PIPE)
-                    cdo_ntime = subp.run(['cdo','ntime',filename], \
-                             stdout=subp.PIPE, stderr=subp.PIPE)
-                    if times == int(cdo_ntime.stdout.decode('utf-8').replace('\n','')):
-                        subp.run(['rm',_Download.filename], \
-                                 stdout=subp.PIPE, stderr=subp.PIPE)
-                    else:
-                         raise ValueError("ERROR:: time steps do not match!!")       
-                                
+            split_era5_process(_Download)      
+        else:
+            if not file_exists(_Download.filename):
+                print(f"ERROR:: {_Download.filename} was not downloaded\n")
+                print("Start process to download year by year and concatenate with CDO\n")
+                p.terminate()
+                p.join()
+                split_era5_process(_Download)
+                
+                   
 
 if __name__ == "__main__":
     
