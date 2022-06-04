@@ -120,8 +120,7 @@ class Era5Process:
                 Area (ºN ºW ºS ºE) = {self._area}
                 Statistic = {self._stat}
                 Frequency = {self._freq}
-                File Name = {self._filename}
-            """
+                File Name = {self._filename}"""
             
     def __repr__(self):
             return f"Era5Process(dataset_name={self._dataset_name}, " \
@@ -160,7 +159,7 @@ class Era5Process:
         
     @property  
     def dataset(self):
-         return self._dataset
+         return self._dataset_name
      
     @property  
     def product_type(self):
@@ -402,7 +401,46 @@ class Era5Process:
         fl=c.retrieve(dataset_name, params)
         fl.download(f"{download_file}")
     
+class ERA5Process(Era5Process):
+    
+    def __init__(self,
+                 dataset_name='reanalysis-era5-single-levels', 
+                              product_type = 'reanalysis',
+                              var = None, 
+                              year = None,
+                              month = None,
+                              day = None,
+                              time = None,
+                              pressure_level=['0'],
+                              grid=['1.0', '1,0'],
+                              area=['90', '-180', '-90', '180'],
+                              stat='instantaneous',
+                              freq='hour', 
+                              filename=None,
+                              byyears = False):
+        super().__init__(dataset_name, product_type,var,year,month,day,time, pressure_level,
+                     grid, area, stat,freq,filename)
+        assert isinstance(byyears,bool), "'byyears' must be boolean!"
+        self._byyears = byyears
         
+    def __str__(self):
+        return f"""
+                {super().__str__()}
+                Donwload by years? = {self._byyears}
+                """
+    @property
+    def byyears(self):
+         return self._byyears
+        
+    @classmethod 
+    def byobj(cls, Era5obj, byyears):
+        assert isinstance(Era5obj, Era5Process), "'Era5obj' must be a Era5Process object"
+        return cls(Era5obj.dataset, Era5obj.product_type,Era5obj.variable,
+                   Era5obj.year,Era5obj.month,Era5obj.day,Era5obj.time, 
+                   Era5obj.pressure_level, Era5obj.grid, Era5obj.area,
+                   Era5obj.statistic, Era5obj.frequency,Era5obj.filename, 
+                   byyears)
+    
 if __name__ == "__main__":
     mydownload = Era5Process(dataset_name='reanalysis-era5-single-levels', \
                  var = '2m_temperature', \
@@ -415,5 +453,7 @@ if __name__ == "__main__":
                  area=['90', '-180', '-90', '180'],\
                  stat= 'accumulated',\
                  freq='day')
-    print(mydownload)
+        
+    myDownload = ERA5Process.byobj(mydownload, True)
+    print(myDownload)
     # mydownload.run(rm_temporal=False)
