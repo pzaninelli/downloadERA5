@@ -48,6 +48,8 @@ class Era5Process:
                  stat='instantaneous',
                  freq='hour', 
                  filename=None):
+        
+        
         self._dataset_name = dataset_name
         self._product_type = product_type
         if not isinstance(var,list):
@@ -103,6 +105,8 @@ class Era5Process:
         self._filename = self._set_filename(self._var, self._stat, self._freq, self._year, filename)
         
         self._was_runned = False
+        
+        
         
 
     def __str__(self):
@@ -400,6 +404,7 @@ class Era5Process:
             # file object
         fl=c.retrieve(dataset_name, params)
         fl.download(f"{download_file}")
+
     
 class ERA5Process(Era5Process):
     

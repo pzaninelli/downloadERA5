@@ -7,6 +7,8 @@ Main program of 'donwloadERA5'
 """
 
 import os
+import sys
+from copy import deepcopy
 import multiprocessing as mp
 from src.Era5Process import * 
 from src.read_params_from_file import get_params_text 
@@ -86,57 +88,27 @@ def run_era5_process(ERA5obj):
 def set_years(ERA5obj,year):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
     ERA5obj.year = [year]
-    assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
     
 def options_app(ERA5obj,options):
     return ERA5Process.byobj(ERA5obj, byyears=options.byyears)
         
 def split_era5_process(ERA5obj):
-    filename = ERA5obj.filename # copy the file name
-    years = ERA5obj.year
+    ERA5obj_c = ERA5obj
+    filename = ERA5obj_c.filename # copy the file name
+    years = ERA5obj_c.year
     times = 0
     print(f"Process will be split in years {years}\n")
+    ERA5_l = []
     for iy in years:
         print(f"Start with year {iy}")
         set_years(ERA5obj, iy)
-        times += len(ERA5obj.dates())
-        run_era5_process(ERA5obj)
-        if iy==years[0] and ERA5obj.Was_runned():
-            subp.run(['cdo','copy',ERA5obj.filename,filename], \
-                     stdout=subp.PIPE, stderr=subp.PIPE)
-            if file_exists(filename):
-                subp.run(['rm',ERA5obj.filename],
-                         stdout=subp.PIPE, stderr=subp.PIPE)
-                print(f"File of year {iy} was donwloaded!")
-        else:
-            subp.run(['cdo','cat',ERA5obj.filename,filename], \
-                     stdout=subp.PIPE, stderr=subp.PIPE)
-            cdo_ntime = subp.run(['cdo','ntime',filename], \
-                     stdout=subp.PIPE, stderr=subp.PIPE)
-            if times == int(cdo_ntime.stdout.decode('utf-8').replace('\n','')):
-                subp.run(['rm',ERA5obj.filename], \
-                         stdout=subp.PIPE, stderr=subp.PIPE)
-                print(f"File of year {iy} was donwloaded!")
-                if iy == years[-1]:
-                    print("".center(50,"*"))
-                    print("the downloading process is finished".upper().center(50,"*"))
-                    print("".center(50,"*"))
-            else:
-                 raise ValueError("ERROR:: time steps do not match!!")
+        print(ERA5obj_c)
+        ERA5_l.append(deepcopy(ERA5obj_c))
+    return ERA5_l
                  
-
-def main():
-    assert is_installed_CDO(), """
-    CDO is not installed!!
-        type 'sudo apt install cdo' for Debian, Ubuntu
-        or visit https://code.mpimet.mpg.de/projects/cdo/files
-        """
-    _Download = downloadERA5_params_from_ini()
-    _Download = options_app(_Download,options)
-    print(_Download)
+def confirmation():
     should_continue = False
     count = 1
-    TIMEOUT = options.timeout # wait 2 hours
     while True:
         if count == 10:
             print("Run the script again!\n")
@@ -153,30 +125,48 @@ def main():
             print("Incorrect option\n")
             continue
         count += 1
-    if should_continue:
-        if not _Download.byyears:
-            p = mp.Process(target=run_era5_process, name = "run_era5_process", args= (_Download,))
-            p.start()
-            p.join(TIMEOUT)        
-            if p.is_alive():
-                print("Killing the process...\n")
-                p.terminate()
-                p.join()
-                filename = _Download.filename # copy the file name
-                if file_exists(filename):
-                    print(f"{filename} was found, so this will be removed!")
-                    subp.run(['rm',filename], stdout=subp.PIPE, stderr=subp.PIPE)
-                    split_era5_process(_Download)      
+    return should_continue
+
+def main():
+    assert is_installed_CDO(), """
+    CDO is not installed!!
+        type 'sudo apt install cdo' for Debian, Ubuntu
+        or visit https://code.mpimet.mpg.de/projects/cdo/files
+        """
+    _Download = downloadERA5_params_from_ini()
+    _Download = options_app(_Download,options)
+    TIMEOUT = options.timeout # wait 2 hours
+    print(_Download)
+    confirmation()    
+    if not should_continue:
+        sys.exit(0)
+    if not _Download.byyears:
+        p = mp.Process(target=run_era5_process, name = "run_era5_process", args= (_Download,))
+        p.start()
+        p.join(TIMEOUT)        
+        if p.is_alive():
+            print("Killing the process...\n")
+            p.terminate()
+            p.join()
+            filename = _Download.filename # copy the file name
+            if file_exists(filename):
+                print(f"{filename} was found, so this will be removed!")
+                subp.run(['rm',filename], stdout=subp.PIPE, stderr=subp.PIPE)
+                split_era5_process(_Download)      
             else:
                 if not file_exists(_Download.filename):
                     print(f"ERROR:: {_Download.filename} was not downloaded\n")
-                    print("Start process to download year by year and concatenate with CDO\n")
+                    # print("Start process to download year by year and concatenate with CDO\n")
                     p.terminate()
                     p.join()
-                    split_era5_process(_Download)
-        else:        
-             print("Download will be done on a yearly basis")
-             split_era5_process(_Download)
+                    split_era5_process(deepcopy(_Download))
+    else:        
+        print("Download will be done on a yearly basis")
+        ERA5_l = split_era5_process(deepcopy(_Download))
+        pool = mp.Pool(mp.cpu_count())
+        results = pool.map(run_era5_process, ERA5_l)
+        pool.close()
+        pool.join()
 
 if __name__ == "__main__":
     
