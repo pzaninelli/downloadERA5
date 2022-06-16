@@ -137,7 +137,7 @@ def main():
     _Download = options_app(_Download,options)
     TIMEOUT = options.timeout # wait 2 hours
     print(_Download)
-    confirmation()    
+    should_continue = confirmation()    
     if not should_continue:
         sys.exit(0)
     if not _Download.byyears:
