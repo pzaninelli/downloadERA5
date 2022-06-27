@@ -356,7 +356,7 @@ class Era5Process:
                      day = None,
                      time = None,
                      pressure_level=None,
-                     grid=[1.0, 1,0],
+                     grid=[1.0, 1.0],
                      area=[90, -180, -90, 180],
                      download_file='./output.nc'):
         import cdsapi, sys
