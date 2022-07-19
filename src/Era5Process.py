@@ -230,7 +230,8 @@ class Era5Process:
     def year(self,new_year_l):
         assert isinstance(new_year_l, list), "ERROR::'new_year_l' must be a list!\n"
         self._year = new_year_l
-        self._filename = self._set_filename(self._var, self._stat, self._freq, new_year_l,filename = None)
+        self._filename = self._set_filename(self._var, self._stat, self._freq, new_year_l,filename = None,
+                                            dirout=self.out_dir)
         self._was_runned = False
         
     def Was_runned(self):
