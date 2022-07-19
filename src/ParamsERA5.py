@@ -44,7 +44,7 @@ class ParamsERA5:
                               area=None,
                               stat=None,
                               freq=None, 
-                              filename=None):
+                              outdir=None):
         self._dataset_name = dataset_name
         self._product_type = product_type
         self._var = var 
@@ -57,7 +57,9 @@ class ParamsERA5:
         self._area = area 
         self._stat = stat 
         self._freq = freq 
-        self._filename = filename 
+        if not path_exists(outdir):
+            raise FileExistsError(f"{outdir} does not exist!")
+        self._outdir = outdir 
         
     @property
     def variable(self):
@@ -108,8 +110,8 @@ class ParamsERA5:
          return self._freq
       
     @property  
-    def filename(self):
-        return self._filename
+    def out_dir(self):
+        return self._outdir
     
     def __repr__(self):
             return f"Era5Process(dataset_name={self._dataset_name}, " \
@@ -124,7 +126,7 @@ class ParamsERA5:
                          f"area={self._area}, "\
                          f"stat={self._stat} , "\
                          f"freq={self._freq}, "\
-                         f"filename={self._filename})"
+                         f"out_dir={self._outdir})"
                          
     @staticmethod
     def arg_options(char,time = False):
@@ -186,7 +188,7 @@ class ParamsERA5:
                    params["area"].split(","),
                    params["statistic"],
                    params["frequency"],
-                   params["outfilename"]
+                   params["outdir"]
                    )
     
 if __name__ == "__main__":
