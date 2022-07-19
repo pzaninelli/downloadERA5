@@ -8,6 +8,7 @@ Created on Sat Mar 12 08:32:27 2022
 import subprocess as subp
 from os.path import exists as file_exists
 import pandas as pd
+import os
     
 class Era5Process:
     """
@@ -47,7 +48,8 @@ class Era5Process:
                  area=['90', '-180', '-90', '180'],
                  stat='instantaneous',
                  freq='hour', 
-                 filename=None):
+                 filename=None,
+                 dirout = None):
         
         
         self._dataset_name = dataset_name
@@ -102,9 +104,20 @@ class Era5Process:
             elif not self._pressure_level==['0']:
                 if not self._dataset_name == 'reanalysis-era5-pressure-levels-monthly-means':
                     raise AttributeError("ERROR:: Dataset must be 'reanalysis-era5-pressure-levels-monthly-means'")
-        self._filename = self._set_filename(self._var, self._stat, self._freq, self._year, filename)
+        if not file_exists(dirout):
+            raise FileExistsError(f"{dirout} does not exist!")    
+        self._dirout = dirout
         
         self._was_runned = False
+        
+        self._filename = self._set_filename(self._var, 
+                                            self._stat, 
+                                            self._freq, 
+                                            self._year, 
+                                            filename, 
+                                            self._dirout)
+        
+        
         
         
         
@@ -124,7 +137,8 @@ class Era5Process:
                 Area (ºN ºW ºS ºE) = {self._area}
                 Statistic = {self._stat}
                 Frequency = {self._freq}
-                File Name = {self._filename}"""
+                File Name = {self._filename}
+                Directory output = {self._dirout}"""
             
     def __repr__(self):
             return f"Era5Process(dataset_name={self._dataset_name}, " \
@@ -208,7 +222,11 @@ class Era5Process:
     @property  
     def filename(self):
         return self._filename
-
+    
+    @property
+    def out_dir(self):
+        return self._dirout
+    
     @year.setter
     def year(self,new_year_l):
         assert isinstance(new_year_l, list), "ERROR::'new_year_l' must be a list!\n"
@@ -328,7 +346,7 @@ class Era5Process:
                     else:
                         print(f"{temp_name} has been deleted!")
     @staticmethod
-    def _set_filename(var,stat,freq,year,filename):
+    def _set_filename(var,stat,freq,year,filename, dirout):
         if filename == None:
             if len(var)==1:
                 var_fname = f"{var[0]}"
@@ -338,8 +356,8 @@ class Era5Process:
                 year_fname = f"{year[0]}-{year[-1]}"
             else:
                 year_fname = f"{year[0]}"
-                
-            Filename = f"./{var_fname}_ERA5_{freq.upper()}_{stat.upper()}_{year_fname}.nc"
+            dirout_b = os.path.dirname(dirout)    
+            Filename = f"{dirout_b}/{var_fname}_ERA5_{freq.upper()}_{stat.upper()}_{year_fname}.nc"
         elif filename != None and file_exists(filename):
             raise AttributeError("ERROR:: Output file name {filename} already exists!")
         else:
@@ -422,9 +440,10 @@ class ERA5Process(Era5Process):
                               stat='instantaneous',
                               freq='hour', 
                               filename=None,
+                              dirout=None,
                               byyears = False):
         super().__init__(dataset_name, product_type,var,year,month,day,time, pressure_level,
-                     grid, area, stat,freq,filename)
+                     grid, area, stat,freq,filename,dirout)
         assert isinstance(byyears,bool), "'byyears' must be boolean!"
         self._byyears = byyears
         
@@ -443,8 +462,8 @@ class ERA5Process(Era5Process):
         return cls(Era5obj.dataset, Era5obj.product_type,Era5obj.variable,
                    Era5obj.year,Era5obj.month,Era5obj.day,Era5obj.time, 
                    Era5obj.pressure_level, Era5obj.grid, Era5obj.area,
-                   Era5obj.statistic, Era5obj.frequency,Era5obj.filename, 
-                   byyears)
+                   Era5obj.statistic, Era5obj.frequency,Era5obj.filename,
+                   Era5obj.out_dir,byyears)
     
 if __name__ == "__main__":
     mydownload = Era5Process(dataset_name='reanalysis-era5-single-levels', \
@@ -457,7 +476,8 @@ if __name__ == "__main__":
                  grid=['0.5', '0.5'],\
                  area=['90', '-180', '-90', '180'],\
                  stat= 'accumulated',\
-                 freq='day')
+                 freq='day',
+                 dirout = '/home/pzaninelli')
         
     myDownload = ERA5Process.byobj(mydownload, True)
     print(myDownload)
