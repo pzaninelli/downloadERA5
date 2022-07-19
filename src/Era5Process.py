@@ -346,6 +346,7 @@ class Era5Process:
                         print(f"{temp_name} has been deleted!")
     @staticmethod
     def _set_filename(var,stat,freq,year,filename, dirout):
+        assert dirout is not None, "dirout was not defined"
         if filename == None:
             if len(var)==1:
                 var_fname = f"{var[0]}"
