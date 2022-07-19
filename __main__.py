@@ -10,6 +10,7 @@ import os
 import sys
 from copy import deepcopy
 import multiprocessing as mp
+import time
 from src.Era5Process import * 
 from src.read_params_from_file import get_params_text 
 from src.ParamsERA5 import *
@@ -79,7 +80,8 @@ def downloadERA5_params_from_ini(_params_ini_file = options.file):
                  area=params.area, 
                  stat=params.statistic, 
                  freq=params.frequency,
-                 filename=params.filename)
+                 filename=params.filename,
+                 dirout = params.out_dir)
         
 def run_era5_process(ERA5obj):
     assert isinstance(ERA5obj, Era5Process), "Must be an Era5Process object!"
@@ -169,5 +171,6 @@ def main():
         pool.join()
 
 if __name__ == "__main__":
-    
+    start_time = time.time()
     main()
+    print("--- %s seconds ---" % (time.time() - start_time))
