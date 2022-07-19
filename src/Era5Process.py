@@ -104,8 +104,7 @@ class Era5Process:
             elif not self._pressure_level==['0']:
                 if not self._dataset_name == 'reanalysis-era5-pressure-levels-monthly-means':
                     raise AttributeError("ERROR:: Dataset must be 'reanalysis-era5-pressure-levels-monthly-means'")
-        if not file_exists(dirout):
-            raise FileExistsError(f"{dirout} does not exist!")    
+     
         self._dirout = dirout
         
         self._was_runned = False
@@ -269,7 +268,7 @@ class Era5Process:
     
     def run(self,rm_temporal=True):
         assert isinstance(self._year, list), "ERROR:: 'year' variable must be a list\n"
-         
+        assert file_exists(self._dirout), f"{self._dirout} does not exist" 
         if self._freq in ["hour", 'month'] and self._stat == "mean":
             self._get_era5(dataset_name = self._dataset_name,
                       product_type= self._product_type,
@@ -281,8 +280,8 @@ class Era5Process:
                       pressure_level=self._pressure_level,
                       grid=self._grid,
                       area=self._area,
-                      download_file='./'+ self._filename)
-            if not file_exists('./' + self._filename):
+                      download_file= self._filename)
+            if not file_exists(self._filename):
                 raise ValueError(f"ERROR:: File {self._filename} does not exist!")
             else:
                 print(f"{self._filename} was downloaded!")
@@ -298,14 +297,14 @@ class Era5Process:
                       pressure_level=self._pressure_level,
                       grid=self._grid,
                       area=self._area,
-                      download_file='./'+ self._filename)
-            if not file_exists('./' + self._filename):
+                      download_file= self._filename)
+            if not file_exists(self._filename):
                 raise ValueError(f"ERROR:: File {self._filename} does not exist!")
             else:
                 print(f"{self._filename} was downloaded!")
                 self._was_runned = True
         else:
-            temp_name = f"./{self._var}_ERA5_temp_{self._year[0]}-{self._year[-1]}.nc"
+            temp_name = f"{os.path.dirname(self._dirout)}/{self._var}_ERA5_temp_{self._year[0]}-{self._year[-1]}.nc"
             if len(self._time)==1:
                 raise ValueError("ERROR:: 'time' variable must have more than one element to get mean or accumulated!")
             print(f"Downloading {temp_name} as temporal file to process with CDO...\n")    
@@ -319,8 +318,8 @@ class Era5Process:
                       pressure_level=self._pressure_level,
                       grid=self._grid,
                       area=self._area,
-                      download_file='./'+ temp_name)
-            if not file_exists('./' + temp_name):
+                      download_file=temp_name)
+            if not file_exists(temp_name):
                 raise ValueError(f"ERROR:: File {temp_name} for frequency {self._freq} does not exist!")
             else:
                 print(f"{temp_name} was downloaded!")
