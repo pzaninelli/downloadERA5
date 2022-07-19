@@ -43,7 +43,8 @@ class ParamsERA5:
                               grid=None,
                               area=None,
                               stat=None,
-                              freq=None, 
+                              freq=None,
+                              filename=None,
                               outdir=None):
         self._dataset_name = dataset_name
         self._product_type = product_type
@@ -57,6 +58,7 @@ class ParamsERA5:
         self._area = area 
         self._stat = stat 
         self._freq = freq 
+        self._filename=filename
         if not path_exists(outdir):
             raise FileExistsError(f"{outdir} does not exist!")
         self._outdir = outdir 
@@ -108,6 +110,10 @@ class ParamsERA5:
     @property 
     def frequency(self):
          return self._freq
+     
+    @property  
+    def filename(self):
+        return self._filename
       
     @property  
     def out_dir(self):
@@ -176,6 +182,11 @@ class ParamsERA5:
             raise AttributeError(f"the initial parameters file '{filepath}' does not exist!")
         config = ConfigParserERA5(filepath)
         params = config.update_sect()
+        if params["filename"] == "":
+            Filename = None
+        else:
+            Filename = params["filename"]
+            
         return cls(params["datasetname"],
                    params["producttype"],
                    params["variable"].split(","),
@@ -188,6 +199,7 @@ class ParamsERA5:
                    params["area"].split(","),
                    params["statistic"],
                    params["frequency"],
+                   Filename,
                    params["outdir"]
                    )
     
