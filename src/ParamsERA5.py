@@ -45,7 +45,10 @@ class ParamsERA5:
                               stat=None,
                               freq=None,
                               filename=None,
-                              outdir=None):
+                              outdir=None,
+                              concat_files=False,
+                              ncpu=None,
+                              rem_tempfiles=False):
         self._dataset_name = dataset_name
         self._product_type = product_type
         self._var = var 
@@ -62,6 +65,9 @@ class ParamsERA5:
         if not path_exists(outdir):
             raise FileExistsError(f"{outdir} does not exist!")
         self._outdir = outdir 
+        self._concat_files=concat_files
+        self._ncpu=ncpu
+        self._rem_tempfiles=rem_tempfiles
         
     @property
     def variable(self):
@@ -114,10 +120,22 @@ class ParamsERA5:
     @property  
     def filename(self):
         return self._filename
+    
+    @property
+    def concat_files(self):
+        return self._concat_files
       
     @property  
     def out_dir(self):
         return self._outdir
+    
+    @property
+    def ncpu(self):
+        return self._ncpu
+    
+    @property
+    def remove_tempfiles(self):
+        return self._rem_tempfiles
     
     def __repr__(self):
             return f"Era5Process(dataset_name={self._dataset_name}, " \
@@ -132,7 +150,10 @@ class ParamsERA5:
                          f"area={self._area}, "\
                          f"stat={self._stat} , "\
                          f"freq={self._freq}, "\
-                         f"out_dir={self._outdir})"
+                         f"out_dir={self._outdir}, "\
+                         f"concat_files={self._concat_files}, "\
+                         f"ncpu={self._ncpu}, "\
+                         f"remove_tempfiles={self._rem_tempfiles})"
                          
     @staticmethod
     def arg_options(char,time = False):
@@ -186,6 +207,10 @@ class ParamsERA5:
             Filename = None
         else:
             Filename = params["filename"]
+        if params["ncpus"] == "":
+            ncpus = None
+        else:
+            ncpus = params["ncpus"]
             
         return cls(params["datasetname"],
                    params["producttype"],
@@ -200,8 +225,12 @@ class ParamsERA5:
                    params["statistic"],
                    params["frequency"],
                    Filename,
-                   params["outdir"]
+                   params["outdir"],
+                   config.getboolean('PARAMETERS',"concatenate_files"),
+                   ncpus,
+                   config.getboolean('PARAMETERS',"remove_temporal_files")
                    )
     
 if __name__ == "__main__":
-    parameters = ParamsERA5.from_file("/home/pzaninelli/TRABAJO/downloadERA5/text/params.ini")
+    parameters = ParamsERA5.from_file("./text/params.ini")
+    print(parameters)
