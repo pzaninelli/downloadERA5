@@ -112,6 +112,9 @@ class Era5Process:
                                             filename, 
                                             self._dirout)
         
+        if 'monthly' in self._dataset_name and self._freq in ['hour', 'day']:
+            raise AttributeError("Monthly product values are not compatible with hourly or daily frequency! Please change the frequency parameter")
+        
         
         
         
