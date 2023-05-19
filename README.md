@@ -24,7 +24,7 @@ pressure_level = [0]
 ```
 For now, only **netcdf** format is available.
 
-_frequency_ can be set to _year_, _month_, _day_ or _hour_. While _stat_ can be set to _instantaneous_, _mean_ or _accumulated_.
+_frequency_ can be set to _year_, _season_, _month_, _day_ or _hour_. While _stat_ can be set to _instantaneous_, _mean_, _accumulated_, _max_, _min_, _average_, _range_, _std_, _std1_, _var_ or _var1_ (see https://code.mpimet.mpg.de/projects/cdo for more information).
 
 To change default options see
 

@@ -1,14 +1,15 @@
-#!/usr/bin/env python3 
-# -*- coding: utf-8 -*-
+
 """
 Created on Sat Mar 12 08:32:27 2022
 @author: Pablo G. Zaninelli
 """
 
-import subprocess as subp
 from os.path import exists as file_exists
 import pandas as pd
 import os
+from functools import partial
+    
+from src.cdoProcess import CDOProcess, concat_cdo
     
 class Era5Process:
     """
@@ -31,9 +32,11 @@ class Era5Process:
         donwload ERA5 file
     """
     
-    __STAT = ['instantaneous', 'mean', 'accumulated']
-    __FREQ = ['hour','day','month','year']
-    __CDO_STAT = {'instantaneous':None, "mean":"mean", "accumulated":"sum"}
+    __STAT = ['instantaneous', 'mean', 'accumulated', 'max', 'min', 
+              'average', 'range', 'std', 'std1', 'var', 'var1']
+    __FREQ = ['hour', 'day', 'month', 'season', 'year']
+    __CDO_STAT = {'instantaneous': None, "mean": "mean", "accumulated": "sum", "max": "max", "min": "min",
+                  'average': 'avg', 'range': 'range','std':'std', 'std1':'std1', 'var':'var', 'var1':'var1'}
     __CDO_FREQ = {'hour':'hour', 'day':'day', 'year':'year'}
     
     def __init__(self,dataset_name='reanalysis-era5-single-levels', 
@@ -91,20 +94,11 @@ class Era5Process:
             self._freq=freq
     
         if self._freq=='hour' and not self._stat=='instantaneous':
-            raise ValueError("ERROR:: hourly frequency only is compatible with 'instantaneous' statistics!")
+            raise ValueError("ERROR:: hourly frequency only is compatible with 'instantaneous' values!")
         
-        if self._stat=='instantaneous' and not self._freq in ['day','hour']:
-            raise ValueError("ERROR:: instantaneous statistic only is allowed with daily or hourly frequency!")
+        if not self._freq=='hour' and self._stat=='instantaneous':
+            raise ValueError("ERROR:: 'instantaneous' values are only compatible with hourly data!")
         
-        if self._freq=="month" and self._stat=='mean':
-            if self._pressure_level==['0']:
-                if not self._dataset_name in ["reanalysis-era5-single-levels-monthly-means",\
-                                              "reanalysis-era5-land-monthly-means"]:
-                    raise AttributeError("ERROR:: Dataset must be 'reanalysis-era5-single-levels-monthly-means' or 'reanalysis-era5-land-monthly-means'")
-            elif not self._pressure_level==['0']:
-                if not self._dataset_name == 'reanalysis-era5-pressure-levels-monthly-means':
-                    raise AttributeError("ERROR:: Dataset must be 'reanalysis-era5-pressure-levels-monthly-means'")
-     
         self._dirout = dirout
         
         self._was_runned = False
@@ -113,8 +107,13 @@ class Era5Process:
                                             self._stat, 
                                             self._freq, 
                                             self._year, 
+                                            self._month,
+                                            self._day,
                                             filename, 
                                             self._dirout)
+        
+        if 'monthly' in self._dataset_name and self._freq in ['hour', 'day']:
+            raise AttributeError("Monthly product values are not compatible with hourly or daily frequency! Please change the frequency parameter")
         
         
         
@@ -226,11 +225,24 @@ class Era5Process:
     def out_dir(self):
         return self._dirout
     
+    def _check_file(self):
+        if not file_exists(self._filename):
+                raise ValueError(f"ERROR:: File {self._filename} does not exist!")
+        else:
+                print(f"{self._filename} was downloaded!")
+                self._was_runned = True
+    
     @year.setter
     def year(self,new_year_l):
         assert isinstance(new_year_l, list), "ERROR::'new_year_l' must be a list!\n"
         self._year = new_year_l
-        self._filename = self._set_filename(self._var, self._stat, self._freq, new_year_l,filename = None,
+        self._filename = self._set_filename(self._var, 
+                                            self._stat, 
+                                            self._freq, 
+                                            new_year_l, 
+                                            self._month, 
+                                            self._day, 
+                                            filename = None,
                                             dirout=self.out_dir)
         self._was_runned = False
         
@@ -266,125 +278,45 @@ class Era5Process:
                                              format = "%Y-%m-%d %H:%M", errors = 'coerce'))
                     
         return [ix for ix in _dates if not isinstance(ix,pd._libs.tslibs.nattype.NaTType)]
-    
-    def run(self,rm_temporal=True):
-        assert isinstance(self._year, list), "ERROR:: 'year' variable must be a list\n"
-        assert file_exists(self._dirout), f"{self._dirout} does not exist" 
-        if self._freq in ["hour", 'month'] and self._stat == "mean":
-            self._get_era5(dataset_name = self._dataset_name,
-                      product_type= self._product_type,
-                      var=self._var, 
-                      year = self._year,
-                      month = self._month,
-                      day = self._day,
-                      time = self._time,
-                      pressure_level=self._pressure_level,
-                      grid=self._grid,
-                      area=self._area,
-                      download_file= self._filename)
-            if not file_exists(self._filename):
-                raise ValueError(f"ERROR:: File {self._filename} does not exist!")
-            else:
-                print(f"{self._filename} was downloaded!")
-                self._was_runned = True
-        elif self._freq in ['hour', 'day'] and self._stat == "instantaneous":
-            self._get_era5(dataset_name = self._dataset_name,
-                      product_type= self._product_type,
-                      var=self._var, 
-                      year = self._year,
-                      month = self._month,
-                      day = self._day,
-                      time = self._time,
-                      pressure_level=self._pressure_level,
-                      grid=self._grid,
-                      area=self._area,
-                      download_file= self._filename)
-            if not file_exists(self._filename):
-                raise ValueError(f"ERROR:: File {self._filename} does not exist!")
-            else:
-                print(f"{self._filename} was downloaded!")
-                self._was_runned = True
-        else:
-            temp_name = f"{os.path.dirname(self._dirout)}/{self._var}_ERA5_temp_{self._year[0]}-{self._year[-1]}.nc"
-            if len(self._time)==1:
-                raise ValueError("ERROR:: 'time' variable must have more than one element to get mean or accumulated!")
-            print(f"Downloading {temp_name} as temporal file to process with CDO...\n")    
-            self._get_era5(dataset_name = self._dataset_name,
-                      product_type= self._product_type,
-                      var=self._var, 
-                      year = self._year,
-                      month = self._month,
-                      day = self._day,
-                      time = self._time,
-                      pressure_level=self._pressure_level,
-                      grid=self._grid,
-                      area=self._area,
-                      download_file=temp_name)
-            if not file_exists(temp_name):
-                raise ValueError(f"ERROR:: File {temp_name} for frequency {self._freq} does not exist!")
-            else:
-                print(f"{temp_name} was downloaded!")
-            print(f"Computing '{self.__CDO_FREQ[self._freq] + self.__CDO_STAT[self._stat]}' with CDO on {temp_name}...\n")
-            cmd = ['cdo','-b','32',self.__CDO_FREQ[self._freq]+self.__CDO_STAT[self._stat],temp_name, self._filename]
-            print(cmd)
-            proc = subp.run(cmd,stdout=subp.PIPE,stderr=subp.PIPE)
-            print(f"""
-                  STDOUT:
-                      {proc.stdout.decode('utf-8')}
-                  STDERR:
-                      {proc.stderr.decode('utf-8')}
-                  """)
-            if not file_exists('./' + self._filename):
-                raise ValueError(f"ERROR:: Problems with CDO computing the {self._stat} in {self._freq}!")
-            else:
-                print(f"{self._filename} was computed!")
-                self._was_runned = True
-                if rm_temporal:
-                    subp.run(['rm',temp_name], stdout = subp.PIPE,stderr=subp.PIPE)
-                    if file_exists(temp_name):
-                        raise ValueError(f"ERROR:: {temp_name} has not been deleted!")
-                    else:
-                        print(f"{temp_name} has been deleted!")
+    # TODO: Fix invalid date problem
     @staticmethod
-    def _set_filename(var,stat,freq,year,filename, dirout):
+    def _set_filename(var, stat, freq, year, month, day, filename, dirout):
         assert dirout is not None, "dirout was not defined"
-        if filename == None:
-            if len(var)==1:
-                var_fname = f"{var[0]}"
+        if filename is None:
+            var_fname = '_'.join(var)
+            date_fname = year[0] + '-' + month[0] + '-' + day[0] + '_' + year[-1] + '-' + month[-1] + '-' + day[-1]
+            if dirout.endswith('/'):
+                dirout_b=dirout[:-1]
             else:
-                var_fname = "variables"
-            if not len(year)==1:
-                year_fname = f"{year[0]}-{year[-1]}"
-            else:
-                year_fname = f"{year[0]}"
-            dirout_b = os.path.dirname(dirout)    
-            Filename = f"{dirout_b}/{var_fname}_ERA5_{freq.upper()}_{stat.upper()}_{year_fname}.nc"
+                dirout_b = dirout
+            Filename = f"{dirout_b}/{var_fname}_ERA5_{freq.upper()}_{stat.upper()}_{date_fname}.nc"
         elif filename != None and file_exists(filename):
-            raise AttributeError("ERROR:: Output file name {filename} already exists!")
+            raise AttributeError(f"ERROR:: Output file name {filename} already exists!")
         else:
-            assert isinstance(filename, str), "'filename' must be an string!"
+            assert isinstance(filename, str), "ERROR:: The name of the file must be an string!"
             Filename = filename
         return Filename
     
-    @staticmethod
-    def _get_era5(dataset_name='reanalysis-era5-single-levels', 
-                     product_type = "reanalysis",
-                     var=None, 
-                     year = None,
-                     month = None,
-                     day = None,
-                     time = None,
-                     pressure_level=None,
-                     grid=[1.0, 1.0],
-                     area=[90, -180, -90, 180],
-                     download_file='./output.nc'):
-        import cdsapi, sys
-        import numpy as np
-        # start the cdsapi client
-        c = cdsapi.Client(timeout=600,quiet=False,debug=True)
+    
+def _get_era5(year = None,
+              dataset_name='reanalysis-era5-single-levels', 
+              product_type = "reanalysis",
+              var=None, 
+              month = None,
+              day = None,
+              time = None,
+              pressure_level=None,
+              grid=[1.0, 1.0],
+              area=[90, -180, -90, 180],
+              download_file='./output.nc',
+              ):
+     import cdsapi, sys
+     import numpy as np
+     # start the cdsapi client
+     c = cdsapi.Client(timeout=600,quiet=False,debug=True)
             
-        # parameters
-        params = dict(
+     # parameters
+     params = dict(
                 format = "netcdf",
                 product_type = product_type,
                 variable = var,
@@ -397,32 +329,32 @@ class Era5Process:
                 pressure_level = pressure_level
             )
         # function to check if a list is included in another
-        def is_include_list(a,b):
+     def is_include_list(a,b):
             set_a = set(a)
             set_b = set(b)
             return False if (set_b.intersection(set_a)==set()) else True
         # test if acceptable pressure level
-        acceptable_pressures = [0,1, 2, 3, 5, 7, 10, 20, 30, 50, 70] + list(np.arange(100, 1000, 25))
-        if not is_include_list(params['pressure_level'], [str(lev) for lev in acceptable_pressures]):
-            sys.stderr.write(f"ERROR:: Pressure level must be in this list: {acceptable_pressures}\n")
-            sys.exit(100)
-        if params['pressure_level'] == ['0']:
-            _ = params.pop('pressure_level')
+     acceptable_pressures = [0,1, 2, 3, 5, 7, 10, 20, 30, 50, 70] + list(np.arange(100, 1000, 25))
+     if not is_include_list(params['pressure_level'], [str(lev) for lev in acceptable_pressures]):
+        sys.stderr.write(f"ERROR:: Pressure level must be in this list: {acceptable_pressures}\n")
+        sys.exit(100)
+     if params['pressure_level'] == ['0']:
+        _ = params.pop('pressure_level')
         # what to do if asking for monthly means
-        if dataset_name in ["reanalysis-era5-single-levels-monthly-means", 
+     if dataset_name in ["reanalysis-era5-single-levels-monthly-means", 
                                 "reanalysis-era5-pressure-levels-monthly-means",
                                 "reanalysis-era5-land-monthly-means"]:
-            params["product_type"] = "monthly_averaged_reanalysis"
-            _ = params.pop("day")
-            params["time"] = "00:00"
+        params["product_type"] = "monthly_averaged_reanalysis"
+        _ = params.pop("day")
+        params["time"] = "00:00"
                 
-        # product_type not needed for era5_land
-        if dataset_name in ["reanalysis-era5-land"]:
-                _ = params.pop("product_type")
+     # product_type not needed for era5_land
+     if dataset_name in ["reanalysis-era5-land"]:
+        _ = params.pop("product_type")
                  
             # file object
-        fl=c.retrieve(dataset_name, params)
-        fl.download(f"{download_file}")
+     fl=c.retrieve(dataset_name, params)
+     fl.download(f"{download_file}")
 
     
 class ERA5Process(Era5Process):
@@ -442,7 +374,7 @@ class ERA5Process(Era5Process):
                               freq='hour', 
                               filename=None,
                               dirout=None,
-                              byyears = False):
+                              byyears = True):
         super().__init__(dataset_name, product_type,var,year,month,day,time, pressure_level,
                      grid, area, stat,freq,filename,dirout)
         assert isinstance(byyears,bool), "'byyears' must be boolean!"
@@ -459,27 +391,113 @@ class ERA5Process(Era5Process):
         
     @classmethod 
     def byobj(cls, Era5obj, byyears):
-        assert isinstance(Era5obj, Era5Process), "'Era5obj' must be a Era5Process object"
-        return cls(Era5obj.dataset, Era5obj.product_type,Era5obj.variable,
-                   Era5obj.year,Era5obj.month,Era5obj.day,Era5obj.time, 
-                   Era5obj.pressure_level, Era5obj.grid, Era5obj.area,
-                   Era5obj.statistic, Era5obj.frequency,Era5obj.filename,
-                   Era5obj.out_dir,byyears)
+        assert isinstance(Era5obj, Era5Process), "'Era5obj' must be a Era5Process class"
+        return cls(Era5obj.dataset,
+                   Era5obj.product_type,
+                   Era5obj.variable,
+                   Era5obj.year,
+                   Era5obj.month,
+                   Era5obj.day,
+                   Era5obj.time, 
+                   Era5obj.pressure_level, 
+                   Era5obj.grid, 
+                   Era5obj.area,
+                   Era5obj.statistic, 
+                   Era5obj.frequency,
+                   Era5obj.filename,
+                   Era5obj.out_dir,
+                   byyears)
+ 
+def _cdo_download_era5(era5obj, # cambiar el orden de los argumentos https://stackoverflow.com/questions/26182068/typeerror-got-multiple-values-for-argument-after-applying-functools-partial
+              year,
+              remove_file) -> tuple:
+    download_file = f'{era5obj.out_dir}/{era5obj.variable[0]}_{year}.nc'
+    if file_exists(download_file):
+        raise ValueError(f"File: {download_file} already exists!")
+    _get_era5_p = partial(_get_era5, 
+                dataset_name=era5obj.dataset, 
+                product_type=era5obj.product_type,
+                var=era5obj.variable, 
+                month=era5obj.month,
+                day=era5obj.day,
+                time=era5obj.time,
+                pressure_level=era5obj.pressure_level,
+                grid=era5obj.grid,
+                area=era5obj.area,
+                download_file=download_file)    
+    _get_era5_p(year)
+    fileout=os.path.splitext(download_file)[0] + '_' + era5obj.frequency.upper() + '_' + era5obj.statistic.upper() + '.nc'
+    Cdo=CDOProcess(download_file, fileout, era5obj.statistic, era5obj.frequency, remove_file)
+    Cdo.run()
+    if not Cdo.stdout is None or not Cdo.stderr is None:
+        print(f"""
+                  STDOUT:
+                      {Cdo.stdout}
+                  STDERR:
+                      {Cdo.stderr}
+                  """)
+    return download_file, fileout
     
+def _download_era5(era5obj,
+              year) -> str:
+    download_file = f'{era5obj.out_dir}/{era5obj.variable[0]}_{year}_HOUR_INSTANTANEOUS.nc'
+    if file_exists(download_file):
+        raise ValueError(f"File: {download_file} already exists!")
+    _get_era5_p = partial(_get_era5, 
+                dataset_name=era5obj.dataset, 
+                product_type=era5obj.product_type,
+                var=era5obj.variable, 
+                month=era5obj.month,
+                day=era5obj.day,
+                time=era5obj.time,
+                pressure_level=era5obj.pressure_level,
+                grid=era5obj.grid,
+                area=era5obj.area,
+                download_file=download_file)    
+    _get_era5_p(year)
+    return download_file
+
+class ERA5PBuilder:
+    
+    __ALLOWED_DATASET = ["reanalysis-era5-single-levels", "reanalysis-era5-land", "reanalysis-era5-pressure-levels"]
+    
+    def __init__(self,
+                 Era5c : Era5Process,
+                ):
+         self._Era5c = Era5c
+         if not self._Era5c.dataset in self.__ALLOWED_DATASET:
+             raise ValueError(f"Only dataset included in {*self.__ALLOWED_DATASET,} are allowed!")
+
+    def era5builder(self):
+        if self._Era5c.frequency in ['day', 'month', 'season', 'year']:
+            return partial(_cdo_download_era5, self._Era5c)
+        else:
+            return partial(_download_era5, self._Era5c)
+
+        
 if __name__ == "__main__":
     mydownload = Era5Process(dataset_name='reanalysis-era5-single-levels', \
                  var = '2m_temperature', \
-                 year = ['1990'],\
-                 month = ["{:02}".format(num) for num in range(1,13)],\
+                 year = ['1990', '1991', '1992'],\
+                 month = ["{:02}".format(num) for num in range(1,3)],\
                  day = ["{:02}".format(num) for num in range(1,32)],\
-                 time = ['00:00', '06:00', '12:00', '18:00'],\
+                 time = ['06:00','12:00'],\
                  pressure_level=['0'],\
-                 grid=['0.5', '0.5'],\
+                 grid=['2', '2'],\
                  area=['90', '-180', '-90', '180'],\
-                 stat= 'accumulated',\
+                 stat= 'mean',\
                  freq='day',
-                 dirout = '/home/pzaninelli')
+                 dirout = '/home/pabloz/prueba_era5')
         
-    myDownload = ERA5Process.byobj(mydownload, True)
-    print(myDownload)
+    print(mydownload)
+    era5b = ERA5PBuilder(mydownload)
+    year = mydownload.year
+    download_era5 = era5b.era5builder()
+    file_orig_l = []
+    fileout_l = []
+    for iy in year:
+        file_orig, fileout = download_era5(iy, remove_file=False)
+        file_orig_l.append(file_orig)
+        fileout_l.append(fileout)
+    concat_cdo(fileout_l, mydownload.filename, verbose=True)
     # mydownload.run(rm_temporal=False)
