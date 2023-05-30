@@ -295,7 +295,7 @@ class Era5Process:
         else:
             assert isinstance(filename, str), "ERROR:: The name of the file must be an string!"
             Filename = filename
-        return Filename
+        return Filename.replace(" ", "")
     
     
 def _get_era5(year = None,
